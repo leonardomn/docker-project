@@ -1,0 +1,90 @@
+version: '2'
+services:
+
+  apache1:
+    container_name: apache1
+    volumes:
+      - ./apache/apache1.html:/var/www/html/index.html
+    networks:
+      tournet:
+        ipv4_address: 172.20.0.10
+    build: ./apache
+  
+  apache2:
+    container_name: apache2
+    volumes:
+      - ./apache/apache2.html:/var/www/html/index.html
+    networks:
+      tournet:
+        ipv4_address: 172.20.0.20
+    build: ./apache
+
+  loadbalancer:
+    image: haproxy
+    container_name: loadbalancer
+    ports:
+      - 80:80
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    networks:
+      tournet:
+        ipv4_address: 172.20.0.30
+    depends_on:
+      - "apache1"
+      - "apache2"
+      - "mysqlserver"
+  
+  mysqlserver:
+    image: mysql
+    container_name: mysqlserver
+    environment:
+      MYSQL_DATABASE: tourradar
+      MYSQL_USER: tr
+      MYSQL_PASSWORD: tr
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - 3306:3306
+    volumes:
+      - ./db:/var/lib/mysql
+    networks:
+      tournet:
+        ipv4_address: 172.20.0.40
+  
+  redis:
+    image: redis
+    container_name: redis
+    networks:
+      tournet:
+        ipv4_address: 172.20.0.50
+
+  php:
+    container_name: php
+    volumes:
+      - ./php:/app
+      - ./php/cron:/var/spool/cron
+    networks:
+      tournet:
+        ipv4_address: 172.20.0.60
+    build: ./php
+
+  ftp:
+    container_name: ftp
+    ports:
+      - "21:21"
+    volumes:
+      - ./ftp/pureftpd.passwd:/etc/pure-ftpd/passwd/pureftpd.passwd
+      - ./ftp/pureftpd.pdb:/etc/pure-ftpd/pureftpd.pdb
+      - ./ftp/tourradar:/home/ftpusers/tourradar
+    networks:
+      tournet:
+        ipv4_address: 172.20.0.70
+    build: ./ftp
+
+networks:
+  tournet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.1/24
+          gateway: 172.20.0.1
